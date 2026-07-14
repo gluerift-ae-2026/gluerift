@@ -1,0 +1,111 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  echo "usage: native/scripts/reproduce --bindings PATH --out-dir PATH --logical-out-prefix PATH [--build-dir PATH] [--network-isolation sandbox-exec|outer]" >&2
+  exit 2
+}
+
+bindings=
+out_dir=
+logical_out_prefix=
+build_dir=
+network_isolation=sandbox-exec
+while test "$#" -gt 0; do
+  case "$1" in
+    --bindings) test "$#" -ge 2 || usage; bindings=$2; shift 2 ;;
+    --out-dir) test "$#" -ge 2 || usage; out_dir=$2; shift 2 ;;
+    --logical-out-prefix) test "$#" -ge 2 || usage; logical_out_prefix=$2; shift 2 ;;
+    --build-dir) test "$#" -ge 2 || usage; build_dir=$2; shift 2 ;;
+    --network-isolation) test "$#" -ge 2 || usage; network_isolation=$2; shift 2 ;;
+    *) usage ;;
+  esac
+done
+test -n "$bindings" && test -n "$out_dir" && test -n "$logical_out_prefix" || usage
+
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+case "$bindings" in /*) ;; *) bindings="$repo/$bindings" ;; esac
+case "$out_dir" in /*) ;; *) out_dir="$repo/$out_dir" ;; esac
+if test -e "$out_dir"; then
+  test -d "$out_dir" || { echo "out-dir exists and is not a directory" >&2; exit 2; }
+  test -z "$(find "$out_dir" -mindepth 1 -maxdepth 1 -print -quit)" || {
+    echo "out-dir must be absent or empty; refusing to delete caller data" >&2
+    exit 2
+  }
+else
+  mkdir -p "$out_dir"
+fi
+out_dir=$(CDPATH= cd -- "$out_dir" && pwd -P)
+case "$out_dir" in "$repo"|"$repo"/*) echo "out-dir must be outside the read-only source tree" >&2; exit 2 ;; esac
+if test -z "$build_dir"; then
+  build_dir="$out_dir.build"
+else
+  case "$build_dir" in /*) ;; *) build_dir="$repo/$build_dir" ;; esac
+fi
+build_dir=$(/usr/bin/python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$build_dir")
+case "$build_dir" in
+  "$repo"|"$repo"/*) echo "build-dir must be outside the read-only source tree" >&2; exit 2 ;;
+  "$out_dir"|"$out_dir"/*) echo "build-dir must be external to the canonical evidence out-dir" >&2; exit 2 ;;
+esac
+case "$out_dir" in "$build_dir"/*) echo "out-dir and build-dir must not be nested" >&2; exit 2 ;; esac
+if test -e "$build_dir"; then
+  test -d "$build_dir" || { echo "build-dir exists and is not a directory" >&2; exit 2; }
+  test -z "$(find "$build_dir" -mindepth 1 -maxdepth 1 -print -quit)" || {
+    echo "build-dir must be absent or empty; refusing to delete caller data" >&2
+    exit 2
+  }
+else
+  mkdir -p "$build_dir"
+fi
+build_dir=$(CDPATH= cd -- "$build_dir" && pwd -P)
+
+"$repo/native/scripts/build" --bindings "$bindings" --out-dir "$build_dir"
+case "$repo$out_dir" in *\"*) echo "unsupported quote in replay path" >&2; exit 2 ;; esac
+runtime_profile="(version 1)(allow default)(deny network*)(deny file-write* (require-all (require-not (subpath \"$out_dir\")) (require-not (literal \"/dev/null\")) (require-not (literal \"/dev/urandom\"))))"
+if test "$network_isolation" = sandbox-exec; then
+  harness_isolation=outer-sandbox-exec
+  probe="/private/tmp/gluerift-runtime-deny-probe.$$"
+  test ! -e "$probe"
+  if /usr/bin/sandbox-exec -p "$runtime_profile" /usr/bin/env -i \
+    LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC SOURCE_DATE_EPOCH=1767225600 \
+    /usr/bin/touch "$probe" 2>/dev/null; then
+    echo "runtime output-only write whitelist probe unexpectedly succeeded at $probe" >&2
+    exit 4
+  fi
+  if test -e "$probe"; then
+    echo "runtime output-only write whitelist probe left $probe; refusing destructive cleanup" >&2
+    exit 4
+  fi
+else
+  harness_isolation=outer
+fi
+run_harness() {
+  mode=$1
+  shift
+  if test "$mode" = sandbox-exec; then
+    /usr/bin/sandbox-exec -p "$runtime_profile" /usr/bin/env -i \
+      LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC SOURCE_DATE_EPOCH=1767225600 \
+      "$build_dir/bin/gluerift-native-harness" reproduce \
+      --bindings "$bindings" \
+      --build-evidence "$build_dir/build-evidence.json" \
+      --go-source "$build_dir/bin/gluerift-native-source" \
+      --rust-target "$build_dir/bin/gluerift-native-target" \
+      --repo "$repo" \
+      --out-dir "$out_dir" \
+      --logical-out-prefix "$logical_out_prefix" \
+      --network-isolation "$harness_isolation"
+  else
+    /usr/bin/env -i LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC SOURCE_DATE_EPOCH=1767225600 \
+    "$build_dir/bin/gluerift-native-harness" reproduce \
+    --bindings "$bindings" \
+    --build-evidence "$build_dir/build-evidence.json" \
+    --go-source "$build_dir/bin/gluerift-native-source" \
+    --rust-target "$build_dir/bin/gluerift-native-target" \
+    --repo "$repo" \
+    --out-dir "$out_dir" \
+    --logical-out-prefix "$logical_out_prefix" \
+    --network-isolation "$harness_isolation"
+  fi
+}
+
+(cd "$repo/native" && run_harness "$network_isolation")

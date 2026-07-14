@@ -1,0 +1,1 @@
+{"archives":{"darwin-aarch64":{"sha256":"94d4246fd90a152a4819419498d3e45c941a31638a57a0a8e32561494ab6cea7","url":"https://github.com/leanprover/lean4/releases/download/v4.19.0/lean-4.19.0-darwin_aarch64.tar.zst"}},"lake_version":"5.0.0-6caaee8","lean_git_commit":"6caaee842e94","lean_version":"4.19.0","schema":"gluerift.lean-toolchain-lock/v1"}

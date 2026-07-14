@@ -1,0 +1,1 @@
+{"generation_mode":"declared-candidate","generation_ordinal":0,"generation_parent_path":[],"generation_rule_id":"core.scalar.declared-bounded-complement","inverse_ir":{"kind":"bounded-complement","max":3,"min":0},"transformation_ir":{"kind":"bounded-complement","max":3,"min":0}}

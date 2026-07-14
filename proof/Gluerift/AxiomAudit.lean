@@ -1,0 +1,44 @@
+import Gluerift
+
+/-!
+Kernel axiom inventory for every load-bearing theorem group.  The accompanying
+audit script rejects `sorryAx` and unsafe declarations.  Any standard principle
+printed here is visible rather than silently omitted.
+-/
+
+#print axioms GlueRift.L1.native_roundtrip_implies_encoder_injective_on_admitted_domain
+#print axioms GlueRift.faithful_iff_adequate_and_precise
+#print axioms GlueRift.L2.target_automorphism_inverse_twist_preserves_native_roundtrip
+#print axioms GlueRift.L2.target_automorphism_inverse_twist_preserves_total_carrier_roundtrip
+#print axioms GlueRift.L3.clean_total_twist_preserves_source_target_source_transport
+#print axioms GlueRift.L3.clean_total_twist_preserves_target_source_target_transport
+#print axioms GlueRift.L4.witness_is_direct_target_native
+#print axioms GlueRift.L4.unsafe_clean_witness_is_direct_target_native_laundering
+#print axioms GlueRift.L4.unsafe_clean_witness_disproves_target_native_soundness
+#print axioms GlueRift.L5.selected_relation_emptiness_makes_soundness_vacuous
+#print axioms GlueRift.L5.nonempty_match_defeats_adequacy_of_empty_relation
+#print axioms GlueRift.L5.V01.all_six_roundtrips_pass
+#print axioms GlueRift.L5.V01.target_native_soundness_fails
+#print axioms GlueRift.L6.carrier_target_bridge_on_scope
+#print axioms GlueRift.L6.carrier_source_bridge_on_scope
+#print axioms GlueRift.L6.carrier_target_bridge_on_declared_domains
+#print axioms GlueRift.L6.carrier_source_bridge_on_declared_domains
+#print axioms GlueRift.L7.target_native_exact_is_functional
+#print axioms GlueRift.L7.source_native_exact_is_inverse_functional
+#print axioms GlueRift.L7.adequate_target_native_match_is_inverse_functional_on_covered_projection
+#print axioms GlueRift.L7.adequate_source_native_match_is_functional_on_covered_projection
+#print axioms GlueRift.L8.exact_observer_stabilizer_is_subgroup
+#print axioms GlueRift.L8.lawful_is_disjoint_union_of_safe_and_harmful
+#print axioms GlueRift.L8.request_scoped_sets_form_exhaustive_partition
+#print axioms GlueRift.L8.T01.sigma1_is_lawful_safe
+#print axioms GlueRift.L8.T01.sigma2_is_lawful_safe
+#print axioms GlueRift.L8.T01.composite_is_lawful_harmful
+#print axioms GlueRift.L8.T01.composite_passes_every_lawfulness_condition_and_is_only_policy_unsound
+#print axioms GlueRift.L8.T01.composite_harm_is_policy_not_law_failure
+#print axioms GlueRift.L8.T02.base_context_passes_all_six_requested_laws
+#print axioms GlueRift.L8.T02.swap_is_selected_comparator_sound
+#print axioms GlueRift.L8.T02.swap_passes_nonlaw_policy_prerequisites_but_fails_requested_laws
+#print axioms GlueRift.L8.T02.sound_but_law_breaking_swap_is_inapplicable_not_safe
+#print axioms GlueRift.L9.total_success_value_judgments_compose
+#print axioms GlueRift.L9.exact_total_success_value_judgments_compose
+#print axioms GlueRift.L9.verified_preorder_total_success_value_judgments_compose

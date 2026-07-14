@@ -1,0 +1,85 @@
+#!/bin/sh
+set -eu
+
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+tools="$repo/.tools"
+downloads="$tools/downloads"
+mkdir -p "$downloads" "$tools/bin" "$tools/gopath" "$tools/gomodcache"
+
+go_archive="$downloads/go1.26.1.darwin-arm64.tar.gz"
+if test ! -f "$go_archive"; then
+  curl -fL --retry 3 \
+    https://go.dev/dl/go1.26.1.darwin-arm64.tar.gz \
+    -o "$go_archive"
+fi
+printf '%s  %s\n' \
+  353df43a7811ce284c8938b5f3c7df40b7bfb6f56cb165b150bc40b5e2dd541f \
+  "$go_archive" | shasum -a 256 -c -
+if test ! -x "$tools/go1.26.1/bin/go"; then
+  test ! -e "$tools/go1.26.1" || {
+    echo "conflicting partial Go toolchain directory; refusing destructive replacement" >&2
+    exit 4
+  }
+  mkdir -p "$tools/go1.26.1"
+  tar -xzf "$go_archive" -C "$tools/go1.26.1" --strip-components=1
+fi
+
+protoc_archive="$downloads/protoc-35.0-osx-aarch_64.zip"
+if test ! -f "$protoc_archive"; then
+  curl -fL --retry 3 \
+    https://github.com/protocolbuffers/protobuf/releases/download/v35.0/protoc-35.0-osx-aarch_64.zip \
+    -o "$protoc_archive"
+fi
+printf '%s  %s\n' \
+  45444963204757fd3e2fbe304bc1fdadfb488d8556ff099c4cc06575eab88976 \
+  "$protoc_archive" | shasum -a 256 -c -
+if test ! -x "$tools/protoc-35.0/bin/protoc"; then
+  test ! -e "$tools/protoc-35.0" || {
+    echo "conflicting partial protoc directory; refusing destructive replacement" >&2
+    exit 4
+  }
+  mkdir -p "$tools/protoc-35.0"
+  ditto -x -k "$protoc_archive" "$tools/protoc-35.0"
+fi
+
+if test ! -x "$tools/bin/protoc-gen-go"; then
+  PATH="$tools/go1.26.1/bin:$PATH" \
+  GOBIN="$tools/bin" \
+  GOMODCACHE="$tools/gomodcache" \
+  GOPATH="$tools/gopath" \
+    "$tools/go1.26.1/bin/go" install \
+      google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+fi
+
+test "$("$tools/go1.26.1/bin/go" version)" = "go version go1.26.1 darwin/arm64"
+test "$("$tools/protoc-35.0/bin/protoc" --version)" = "libprotoc 35.0"
+test "$("$tools/bin/protoc-gen-go" --version)" = "protoc-gen-go v1.36.11"
+
+# Tool discovery is confined to provisioning. Never bind the moving `stable`
+# alias: doing so would let a later rustup channel update silently change the
+# supposedly pinned compiler behind these workspace-local entry points.
+rust_toolchain=1.95.0-aarch64-apple-darwin
+if ! rustc=$(rustup which --toolchain "$rust_toolchain" rustc 2>/dev/null); then
+  rustup toolchain install "$rust_toolchain" --profile minimal --no-self-update
+  rustc=$(rustup which --toolchain "$rust_toolchain" rustc)
+fi
+cargo=$(rustup which --toolchain "$rust_toolchain" cargo)
+rustdoc=$(rustup which --toolchain "$rust_toolchain" rustdoc)
+linker=$(xcrun -f ld)
+ln -sfn "$rustc" "$tools/bin/rustc"
+ln -sfn "$cargo" "$tools/bin/cargo"
+ln -sfn "$rustdoc" "$tools/bin/rustdoc"
+ln -sfn /usr/bin/cc "$tools/bin/cc"
+ln -sfn "$linker" "$tools/bin/ld"
+
+mkdir -p "$tools/cargo-home" "$tools/build-home"
+host=$("$tools/bin/rustc" -vV | sed -n 's/^host: //p')
+CARGO_HOME="$tools/cargo-home" "$tools/bin/cargo" fetch --locked \
+  --target "$host" \
+  --manifest-path "$repo/native/rust/Cargo.toml"
+CARGO_HOME="$tools/cargo-home" "$tools/bin/cargo" fetch --locked \
+  --target "$host" \
+  --manifest-path "$repo/checker/Cargo.toml"
+
+test "$("$tools/bin/rustc" --version)" = "rustc 1.95.0 (59807616e 2026-04-14)"
+test "$("$tools/bin/cargo" --version)" = "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"

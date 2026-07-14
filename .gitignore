@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/
+*.pyc
+.worklog/
+.tools/
+artifact/.staging/
+checker/target*/
+native/.cache/
+native/rust/target/
+proof/.lake/
+proof/.toolchain/

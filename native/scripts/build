@@ -1,0 +1,93 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  echo "usage: native/scripts/build --bindings PATH --out-dir PATH" >&2
+  exit 2
+}
+
+bindings=
+out_dir=
+while test "$#" -gt 0; do
+  case "$1" in
+    --bindings) test "$#" -ge 2 || usage; bindings=$2; shift 2 ;;
+    --out-dir) test "$#" -ge 2 || usage; out_dir=$2; shift 2 ;;
+    *) usage ;;
+  esac
+done
+test -n "$bindings" && test -n "$out_dir" || usage
+
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+case "$bindings" in /*) ;; *) bindings="$repo/$bindings" ;; esac
+case "$out_dir" in /*) ;; *) out_dir="$repo/$out_dir" ;; esac
+test -f "$bindings"
+out_dir=$(CDPATH= cd -- "$out_dir" && pwd -P)
+case "$out_dir" in "$repo"|"$repo"/*) echo "build out-dir must be outside the read-only source tree" >&2; exit 2 ;; esac
+
+go="$repo/.tools/go1.26.1/bin/go"
+cargo="$repo/.tools/bin/cargo"
+rustc="$repo/.tools/bin/rustc"
+cc="$repo/.tools/bin/cc"
+linker="$repo/.tools/bin/ld"
+test -x "$go" && test -x "$cargo" && test -x "$rustc" && test -x "$cc" && test -x "$linker"
+
+mkdir -p "$out_dir/bin" "$out_dir/cargo-target" "$out_dir/cache"
+test -d "$repo/.tools/cargo-home" && test -d "$repo/.tools/gomodcache"
+/usr/bin/ditto "$repo/.tools/cargo-home" "$out_dir/cache/cargo-home"
+/usr/bin/ditto "$repo/.tools/gomodcache" "$out_dir/cache/gomodcache"
+mkdir -p "$out_dir/cache/gopath" "$out_dir/cache/home" "$out_dir/cache/go-build" "$out_dir/cache/tmp"
+case "$repo$out_dir" in *\"*) echo "unsupported quote in build path" >&2; exit 2 ;; esac
+profile="(version 1)(allow default)(deny network*)(deny file-write* (require-all (require-not (subpath \"$out_dir\")) (require-not (literal \"/dev/null\")) (require-not (literal \"/dev/urandom\"))))"
+common_lang='C.UTF-8'
+source_date_epoch=1767225600
+
+probe="/private/tmp/gluerift-build-deny-probe.$$"
+test ! -e "$probe"
+if /usr/bin/sandbox-exec -p "$profile" /usr/bin/env -i \
+  LANG="$common_lang" LC_ALL="$common_lang" TZ=UTC SOURCE_DATE_EPOCH="$source_date_epoch" \
+  /usr/bin/touch "$probe" 2>/dev/null; then
+  echo "output-only write whitelist probe unexpectedly succeeded at $probe" >&2
+  exit 4
+fi
+if test -e "$probe"; then
+  echo "output-only write whitelist probe left $probe; refusing destructive cleanup" >&2
+  exit 4
+fi
+
+(cd "$repo/native/go" && \
+  /usr/bin/sandbox-exec -p "$profile" /usr/bin/env -i \
+    LANG="$common_lang" LC_ALL="$common_lang" TZ=UTC SOURCE_DATE_EPOCH="$source_date_epoch" \
+    HOME="$out_dir/cache/home" TMPDIR="$out_dir/cache/tmp" CGO_ENABLED=0 GOFLAGS=-mod=readonly \
+    GOCACHE="$out_dir/cache/go-build" GOMODCACHE="$out_dir/cache/gomodcache" GOPATH="$out_dir/cache/gopath" \
+    "$go" build -trimpath -buildvcs=false -mod=readonly \
+    -o "$out_dir/bin/gluerift-native-source" ./cmd/source)
+
+(cd "$repo/native/rust" && \
+  /usr/bin/sandbox-exec -p "$profile" /usr/bin/env -i \
+    LANG="$common_lang" LC_ALL="$common_lang" TZ=UTC SOURCE_DATE_EPOCH="$source_date_epoch" \
+    HOME="$out_dir/cache/home" TMPDIR="$out_dir/cache/tmp" CARGO_HOME="$out_dir/cache/cargo-home" \
+    CARGO_INCREMENTAL=0 CARGO_TARGET_DIR="$out_dir/cargo-target" \
+    CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="$cc" CC="$cc" PATH="$repo/.tools/bin:/usr/bin:/bin" \
+    RUSTC="$rustc" RUSTFLAGS="--remap-path-prefix=$repo=/src --remap-path-prefix=$out_dir=/build" \
+    "$cargo" build --release --locked --offline \
+    --manifest-path Cargo.toml \
+    --bin gluerift-native-target --bin gluerift-native-harness)
+
+/bin/cp "$out_dir/cargo-target/release/gluerift-native-target" "$out_dir/bin/gluerift-native-target"
+/bin/cp "$out_dir/cargo-target/release/gluerift-native-harness" "$out_dir/bin/gluerift-native-harness"
+
+/usr/bin/sandbox-exec -p "$profile" /usr/bin/env -i \
+  LANG="$common_lang" LC_ALL="$common_lang" TZ=UTC SOURCE_DATE_EPOCH="$source_date_epoch" \
+  HOME="$out_dir/cache/home" TMPDIR="$out_dir/cache/tmp" \
+  /usr/bin/python3 "$repo/native/scripts/make-build-evidence.py" \
+  --bindings "$bindings" \
+  --go "$go" \
+  --go-source "$out_dir/bin/gluerift-native-source" \
+  --cargo "$cargo" \
+  --rustc "$rustc" \
+  --rust-target "$out_dir/bin/gluerift-native-target" \
+  --native-harness "$out_dir/bin/gluerift-native-harness" \
+  --cc "$cc" \
+  --linker "$linker" \
+  --out "$out_dir/build-evidence.json" \
+  --repo "$repo"

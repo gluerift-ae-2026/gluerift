@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+if test "$(uname -s)" != Darwin || test "$(uname -m)" != arm64; then
+  echo "GlueRift Core is pinned and tested only for Darwin/arm64." >&2
+  exit 4
+fi
+
+for tool in curl shasum tar ditto rustup xcrun zstd; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "missing provisioning prerequisite: $tool" >&2
+    exit 4
+  }
+done
+
+echo "[GlueRift] provisioning the checksum-pinned Lean toolchain"
+"$root/proof/bootstrap.sh"
+
+echo "[GlueRift] provisioning checksum/version-pinned native toolchains and dependency caches"
+"$root/native/scripts/bootstrap-tools"
+
+echo "[GlueRift] verifying the pinned Darwin host/toolchain descriptor"
+/usr/bin/python3 "$root/artifact/lib/image_lock.py" \
+  --root "$root" \
+  --lock "$root/native/host-toolchain.lock.json" >/dev/null
+
+echo "[GlueRift] tool bootstrap complete; run ./artifact/reproduce"

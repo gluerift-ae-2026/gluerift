@@ -1,0 +1,1 @@
+{"carrier_type":{"kind":"bool"},"schema":"gluerift.adapter-context/v0.3.1a","source_decode":{"kind":"identity"},"source_encode":{"kind":"identity"},"source_type":{"kind":"bool"},"target_decode":{"kind":"identity"},"target_encode":{"kind":"identity"},"target_type":{"kind":"bool"}}

@@ -1,0 +1,1 @@
+{"fixture_id":"E02","operation_id":"program-output","payload":{"source_program_output":{"policy":{"bounds":{"maximum":2,"minimum":0}}}},"schema":"gluerift.native-protocol/v1"}

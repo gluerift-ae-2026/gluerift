@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package gluerift.native.v1;
+
+option go_package = "gluerift/native/gen/nativepb";
+
+// Logical carrier for E01. Zero is deliberately invalid so malformed or
+// default-valued messages cannot be coerced into a semantic decision.
+enum DecisionCarrier {
+  DECISION_CARRIER_UNSPECIFIED = 0;
+  DECISION_CARRIER_DENY = 1;
+  DECISION_CARRIER_ALLOW = 2;
+}
+
+message E01Carrier {
+  DecisionCarrier decision = 1;
+}
+
+// The two E02 fields have the same wire type but independently owned roles.
+message BoundsCarrier {
+  sint32 minimum_slot = 1;
+  sint32 maximum_slot = 2;
+}
+
+message PolicyCarrier {
+  BoundsCarrier bounds = 1;
+}
+
+message E02Carrier {
+  PolicyCarrier policy = 1;
+}

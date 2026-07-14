@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+protoc="$repo/.tools/protoc-35.0/bin/protoc"
+plugin="$repo/.tools/bin/protoc-gen-go"
+
+test -x "$protoc"
+test -x "$plugin"
+
+generated_root="$repo/.tools/proto-generation/protoc-35.0_go-1.36.11"
+generated="$generated_root/gen/nativepb/gluerift_native.pb.go"
+if test ! -f "$generated"; then
+  mkdir -p "$generated_root"
+
+  "$protoc" \
+    --plugin="protoc-gen-go=$plugin" \
+    --proto_path="$repo/native/proto" \
+    --go_out="$generated_root" \
+    --go_opt=module=gluerift/native \
+    "$repo/native/proto/gluerift_native.proto"
+fi
+
+destination="$repo/native/go/gen/nativepb/gluerift_native.pb.go"
+
+if test "${1:-}" = "--check"; then
+  cmp "$generated" "$destination"
+else
+  mkdir -p "$(dirname -- "$destination")"
+  cp "$generated" "$destination"
+fi

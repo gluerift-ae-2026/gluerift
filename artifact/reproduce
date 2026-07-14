@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+exec /usr/bin/env -i \
+  LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC SOURCE_DATE_EPOCH=1767225600 \
+  /usr/bin/python3 "$root/artifact/lib/reproduce.py" --root "$root" "$@"

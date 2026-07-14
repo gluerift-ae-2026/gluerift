@@ -1,0 +1,1 @@
+{"acceptance_rule":"all-explicitly-requested-round-trip-laws-proved-exhaustive","baseline_id":"BL2","paired_run_ids":["A01","A02","A03","A05"],"receives_endpoint_policy":false,"schema":"gluerift.baseline-configuration/v0.3.1a","shared_candidate_scope_totality":true}

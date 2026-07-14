@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+paper_dir="$repo_root/paper"
+output_dir="$repo_root/output/pdf"
+
+mkdir -p "$output_dir"
+cd "$paper_dir"
+latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error main.tex
+
+if grep -Eq 'undefined references|Citation .* undefined|Overfull \\[hv]box' main.log; then
+  echo 'paper build failed: unresolved reference or layout overflow' >&2
+  exit 1
+fi
+
+cp main.pdf "$output_dir/round-trips-can-lie.pdf"
+echo "$output_dir/round-trips-can-lie.pdf"
+
